@@ -28,3 +28,8 @@ Thumbs.db
 # Secrets (never commit tokens)
 .env
 secrets.toml
+
+shopsync_config.json
+__pycache__/
+*.pyc
+.venv/
