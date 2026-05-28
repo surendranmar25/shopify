@@ -20,8 +20,6 @@ import streamlit as st
 
 # ── Local modules ─────────────────────────────────────────────────────────────
 from shopify_api import (
-    load_config,
-    save_config,
     fetch_all_shopify_skus,
     fetch_google_sheet_public,
     fetch_google_sheet_private,
@@ -260,12 +258,11 @@ hr { border-color: var(--border); margin: 1rem 0; }
 # SESSION STATE INIT  (runs once per browser session)
 # ============================================================
 if "config_loaded" not in st.session_state:
-    cfg    = load_config()
-    as_cfg = cfg.get("auto_sync", {})
+    as_cfg = {}
 
-    st.session_state.saved_shop_url     = cfg.get("shop_url", "")
-    st.session_state.saved_token        = cfg.get("access_token", "")
-    st.session_state.saved_api_version  = cfg.get("api_version", "2025-04")
+    st.session_state.saved_shop_url     = ""
+    st.session_state.saved_token        = ""
+    st.session_state.saved_api_version  = "2025-04"
 
     # Auto-sync settings
     st.session_state.auto_sync_enabled  = as_cfg.get("enabled", False)
@@ -314,15 +311,6 @@ with st.sidebar:
     sb_version = st.text_input("API Version",  value=st.session_state.saved_api_version,
                                 key="sidebar_api_version")
 
-    if st.button("💾 Save API Settings", use_container_width=True, key="sb_save"):
-        cfg = load_config()
-        cfg.update(shop_url=sb_url, access_token=sb_token, api_version=sb_version)
-        save_config(cfg)
-        st.session_state.saved_shop_url    = sb_url
-        st.session_state.saved_token       = sb_token
-        st.session_state.saved_api_version = sb_version
-        st.success("✅ Saved!")
-
     st.markdown("---")
 
     # Connection pill
@@ -360,7 +348,7 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size:0.78rem; opacity:0.7; line-height:1.8;">
     <strong style="opacity:1;">📋 Quick Guide</strong><br>
-    1. Enter &amp; <strong>Save</strong> API credentials<br>
+    1. Enter API credentials in the sidebar<br>
     2. 🏷️ Price tab → upload price file<br>
     3. 📦 Stock tab → upload stock file<br>
     4. 📊 Google Sheets → auto-sync setup<br>
@@ -388,7 +376,7 @@ exp_label  = ("⚙️ API Settings  ·  ✅ Connected" if connected
                else "⚙️ API Settings  ·  ⚠️ Not configured — click to set up")
 
 with st.expander(exp_label, expanded=not connected):
-    ec1, ec2, ec3, save_col = st.columns([3, 3, 2, 1])
+    ec1, ec2, ec3 = st.columns([3, 3, 2])
     with ec1:
         il_url = st.text_input("🌐 Shop URL", value=SHOP_URL,
                                 placeholder="yourstore.myshopify.com", key="inline_shop_url")
@@ -397,16 +385,6 @@ with st.expander(exp_label, expanded=not connected):
                                 placeholder="shpat_xxxxxxxxxxxx", type="password", key="inline_token")
     with ec3:
         il_ver = st.text_input("📅 API Version", value=API_VERSION, key="inline_api_version")
-    with save_col:
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("💾 Save", key="inline_save", use_container_width=True):
-            cfg = load_config()
-            cfg.update(shop_url=il_url, access_token=il_tok, api_version=il_ver)
-            save_config(cfg)
-            st.session_state.saved_shop_url    = il_url
-            st.session_state.saved_token       = il_tok
-            st.session_state.saved_api_version = il_ver
-            st.success("✅ Saved!")
 
     if il_url and il_tok:
         st.markdown('<span class="badge badge-success">✅ Credentials entered — collapse this panel</span>',
@@ -788,16 +766,6 @@ with tab_gs:
             st.session_state.gs_sheet_name      = gs_sheet_name
             st.session_state.next_sync_time     = time.time() + interval_secs
 
-            cfg = load_config()
-            cfg["auto_sync"] = {
-                "enabled":          True,
-                "interval_seconds": interval_secs,
-                "sync_type":        sync_type,
-                "sheet_url":        gs_url_input,
-                "auth_type":        "public" if gs_auth_type == "Public" else "private",
-                "sheet_name":       gs_sheet_name,
-            }
-            save_config(cfg)
             st.success(
                 f"✅ Auto-sync started — first sync in "
                 f"**{interval_secs // 60} min{'s' if interval_secs >= 120 else ''}**. "
@@ -808,9 +776,6 @@ with tab_gs:
     if stop_btn:
         st.session_state.auto_sync_enabled = False
         st.session_state.next_sync_time    = None
-        cfg = load_config()
-        cfg.setdefault("auto_sync", {})["enabled"] = False
-        save_config(cfg)
         st.info("Auto-sync stopped.")
         st.rerun()
 
@@ -902,7 +867,7 @@ with tab_guide:
                 <li><strong>Develop apps → Create an app</strong></li>
                 <li>Enable <code>write_products</code> &amp; <code>write_inventory</code></li>
                 <li>Install the app → copy the <strong>Admin API access token</strong></li>
-                <li>Paste in the sidebar → click <strong>💾 Save API Settings</strong></li>
+                <li>Paste in the sidebar — credentials apply instantly</li>
             </ol>
         </div>
         <div class="card" style="margin-top:0;">
@@ -912,7 +877,7 @@ with tab_guide:
                 <li>Prices strip <code>₹</code> and commas automatically</li>
                 <li>Unchanged prices are <strong>skipped</strong> to save API calls</li>
                 <li>Inventory set to the <strong>first Shopify location</strong></li>
-                <li>Credentials saved to <code>shopsync_config.json</code> locally</li>
+                <li>Credentials are session-only — re-enter on each app restart</li>
                 <li>Auto-sync countdown shown in the sidebar while active</li>
                 <li>Rate limit: 0.2 s delay per API call (Shopify-compliant)</li>
             </ul>
